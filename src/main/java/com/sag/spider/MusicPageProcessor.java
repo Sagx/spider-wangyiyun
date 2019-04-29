@@ -89,13 +89,26 @@ public class MusicPageProcessor implements PageProcessor {
 		if (validateRes(resTemp)) {
 			commentCount = (Integer) JSONPath.eval(JSONObject.parseObject(resTemp),"$.total");
 		}
-		for (int offset = 0; offset < commentCount; offset += Constants.ONE_PAGE) {
-			log.info("{}/{} {}",offset,commentCount,song.getName());
-			String res = SpiderUtil.httpPost(songId, offset);
-			if (!validateRes(res)) {
-				log.error("SongName:" + song.getName() + "，offset:" + (offset - Constants.ONE_PAGE));
+		for (int offset = 5040; offset < commentCount; offset += Constants.ONE_PAGE) {
+			log.info("{} {}/{}",song.getName(),offset,commentCount);
+			//爬取失败重试两次
+			String res = null;
+			boolean reqSuccess = false;
+			for (int i=0;i<3;i++){
+				if (i>0){
+					log.info("重试...");
+				}
+				res = SpiderUtil.httpPost(songId, offset);
+				if (validateRes(res)) {
+					reqSuccess = true;
+					break;
+				}
+			}
+			if (!reqSuccess){
+				log.error("SongName:{}，offset:{}", song.getName(), offset);
 				break;
 			}
+			//开始解析评论
 			JSONObject resJson = JSON.parseObject(res);
 			List<Integer> commentIds = SpiderUtil.cast(JSONPath.eval(resJson, "$.comments.commentId"));
 			List<String> contents = SpiderUtil.cast(JSONPath.eval(resJson, "$.comments.content"));
@@ -128,8 +141,19 @@ public class MusicPageProcessor implements PageProcessor {
 		return commentCount;
 	}
 
+	/**
+	 * 验证爬取评论请求结果
+	 * @param response  response
+	 * @return          true/false
+	 */
 	private boolean validateRes(String response){
 		if (response == null || response.contains("503 Service Temporarily Unavailable") || response.equals("{\"code\":-460,\"msg\":\"Cheating\"}")) {
+			log.error("爬取失败！ Res:{}",response);
+			return false;
+		}
+		try{
+			JSONObject.parse(response);
+		}catch (Exception e){
 			log.error("爬取失败！ Res:{}",response);
 			return false;
 		}

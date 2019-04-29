@@ -1,5 +1,6 @@
 package com.sag.util;
 
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -25,12 +26,13 @@ import java.util.List;
 /**
  * 爬虫工具类
  */
-
+@Slf4j
 public class SpiderUtil {
 
 	public static String httpPost(String songId, int offset) {
 		CloseableHttpClient httpclient = HttpClients.createDefault();
 		CloseableHttpResponse response = null;
+		//http://music.163.com/api/v1/resource/comments/R_SO_4_516997458?limit=20&offset=40
 		String first_param = "{rid:\"\", offset:\"" + offset + "\", total:\"true\", limit:\"" + Constants.ONE_PAGE + "\", csrf_token:\"\"}";
 		try {
 			// 参数加密，16位随机字符串，直接FFF
@@ -40,14 +42,14 @@ public class SpiderUtil {
 			String encSecKey = rsaEncrypt();
 			HttpPost httpPost = new HttpPost("http://music.163.com/weapi/v1/resource/comments/R_SO_4_" + songId + "/?csrf_token=");
 			httpPost.addHeader("Referer", Constants.BASE_URL);
-			List<NameValuePair> ls = new ArrayList<NameValuePair>();
+			List<NameValuePair> ls = new ArrayList<>();
 			ls.add(new BasicNameValuePair("params", encText));
 			ls.add(new BasicNameValuePair("encSecKey", encSecKey));
 			UrlEncodedFormEntity paramEntity = new UrlEncodedFormEntity(ls, "utf-8");
 			httpPost.setEntity(paramEntity);
 			//设置代理
 			HttpHost proxy = new HttpHost(Constants.PROXY_HOST,Constants.PROXY_PORT);
-   			RequestConfig requestConfig = RequestConfig.custom().setProxy(proxy).build();
+   			RequestConfig requestConfig = RequestConfig.custom().setProxy(proxy).setConnectTimeout(5000).setConnectionRequestTimeout(5000).setSocketTimeout(10000).build();
 			httpPost.setConfig(requestConfig);
 
 			httpPost.setHeader("Proxy-Authorization", authHeader());
@@ -58,7 +60,7 @@ public class SpiderUtil {
 				return EntityUtils.toString(entity, "utf-8");
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error(e.getMessage());
 		} finally {
 			try {
 				if (response != null) {
